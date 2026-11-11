@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotient Tac Toe - Math Game</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;600;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    <!-- PeerJS for Free Peer-to-Peer Networking (No Backend Required) -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 60%, #020617 100%);
+            color: #f8fafc;
+            user-select: none;
+        }
+        .font-game {
+            font-family: 'Fredoka', cursive;
+        }
+        .font-display {
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Modern Glass & Panel Styles */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .board-container {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(99, 102, 241, 0.2);
+        }
+        
+        /* Custom 3D Dice Styles */
+        .dice-container {
+            perspective: 600px;
+        }
+        .dice {
+            width: 70px;
+            height: 70px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s ease-out;
+        }
+
+        /* Animations */
+        @keyframes stealSplash {
+            0% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.15) rotate(3deg); filter: brightness(1.5) drop-shadow(0 0 25px #6366f1); }
+            100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+        }
+        .animate-steal {
+            animation: stealSplash 0.75s ease-in-out;
+        }
+
+        @keyframes winReel {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(245, 158, 11, 0.6); }
+            50% { transform: scale(1.05); box-shadow: 0 0 40px rgba(245, 158, 11, 1); }
+        }
+        .animate-win {
+            animation: winReel 1.2s infinite;
+        }
+
+        /* Animation for claimed tiles */
+        @keyframes tileSelect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+        .animate-select {
+            animation: tileSelect 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-6 overflow-x-hidden">
+
+    <!-- INITIAL SETUP MODAL (GAME MODE, NAMES & COLORS) -->
+    <div id="setupModal" class="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 z-50">
+        <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-lg w-full border border-indigo-500/40 shadow-2xl relative text-left">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-3xl shadow-lg border border-white/20 mx-auto mb-3">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <h2 class="text-3xl font-black font-display text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">GAME SETUP</h2>
+                <p class="text-xs text-slate-400 font-medium">Choose your game mode, enter player names, and pick your team colors!</p>
+            </div>
+
+            <!-- Mode Selection Tabs -->
+            <div class="mb-5">
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">1. Game Mode</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="setupBtnHuman" onclick="setSetupMode('human')" class="py-3 px-4 rounded-xl border-2 border-indigo-500 bg-indigo-950/60 text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-users text-indigo-400"></i> vs. Human
+                    </button>
+                    <button id="setupBtnAi" onclick="setSetupMode('ai')" class="py-3 px-4 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 hover:text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-robot text-purple-400"></i> vs. Math AI
+                    </button>
+                </div>
+            </div>
+
+            <!-- Player 1 Setup -->
+            <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 mb-4">
+                <label class="block text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">Player 1 / Team 1</label>
+                <div class="flex gap-3 items-center mb-3">
+                    <input type="text" id="setupP1Name" value="Team Red" maxlength="16" placeholder="Enter Name..." class="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white font-bold text-sm rounded-xl outline-none focus:border-rose-400">
+                </div>
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 block mb-1.5 uppercase">Choose Color</span>
+                    <div class="flex gap-2" id="p1ColorPickers">
+                        <button onclick="selectColor(1, 'rose')" class="w-8 h-8 rounded-full bg-rose-600 border-2 border-white scale-110 shadow" data-color="rose"></button>
+                        <button onclick="selectColor(1, 'cyan')" class="w-8 h-8 rounded-full bg-cyan-600 border-2 border-transparent hover:border-white" data-color="cyan"></button>
+                        <button onclick="selectColor(1, 'emerald')" class="w-8 h-8 rounded-full bg-emerald-600 border-2 border-transparent hover:border-white" data-color="emerald"></button>
+                        <button onclick="selectColor(1, 'amber')" class="w-8 h-8 rounded-full bg-amber-500 border-2 border-transparent hover:border-white" data-color="amber"></button>
+                        <button onclick="selectColor(1, 'purple')" class="w-8 h-8 rounded-full bg-purple-600 border-2 border-transparent hover:border-white" data-color="purple"></button>
+                        <button onclick="selectColor(1, 'pink')" class="w-8 h-8 rounded-full bg-pink-600 border-2 border-transparent hover:border-white" data-color="pink"></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player 2 Setup -->
+            <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 mb-6">
+                <label class="block text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1" id="setupP2Label">Player 2 / Team 2</label>
+                <div class="flex gap-3 items-center mb-3">
+                    <input type="text" id="setupP2Name" value="Team Blue" maxlength="16" placeholder="Enter Name..." class="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white font-bold text-sm rounded-xl outline-none focus:border-cyan-400">
+                </div>
+                <div>
+                    <span class="text-[11px] font-bold text-slate-400 block mb-1.5 uppercase">Choose Color</span>
+                    <div class="flex gap-2" id="p2ColorPickers">
+                        <button onclick="selectColor(2, 'rose')" class="w-8 h-8 rounded-full bg-rose-600 border-2 border-transparent hover:border-white" data-color="rose"></button>
+                        <button onclick="selectColor(2, 'cyan')" class="w-8 h-8 rounded-full bg-cyan-600 border-2 border-white scale-110 shadow" data-color="cyan"></button>
+                        <button onclick="selectColor(2, 'emerald')" class="w-8 h-8 rounded-full bg-emerald-600 border-2 border-transparent hover:border-white" data-color="emerald"></button>
+                        <button onclick="selectColor(2, 'amber')" class="w-8 h-8 rounded-full bg-amber-500 border-2 border-transparent hover:border-white" data-color="amber"></button>
+                        <button onclick="selectColor(2, 'purple')" class="w-8 h-8 rounded-full bg-purple-600 border-2 border-transparent hover:border-white" data-color="purple"></button>
+                        <button onclick="selectColor(2, 'pink')" class="w-8 h-8 rounded-full bg-pink-600 border-2 border-transparent hover:border-white" data-color="pink"></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Warning Message -->
+            <div id="setupErrorMsg" class="hidden mb-4 p-2.5 bg-rose-950/80 border border-rose-600 text-rose-300 text-xs font-bold rounded-xl text-center"></div>
+
+            <button onclick="confirmSetupAndStart()" class="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-black text-lg rounded-xl shadow-xl font-display transition transform active:scale-95 flex items-center justify-center gap-2">
+                <i class="fas fa-play"></i> START GAME
+            </button>
+        </div>
+    </div>
+
+    <!-- HEADER / TOP NAVIGATION -->
+    <header class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-2xl shadow-lg border border-white/20">
+                <i class="fas fa-divide"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-black tracking-tight font-display text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">QUOTIENT TAC TOE</h1>
+                <p class="text-xs text-slate-400 font-medium"><i class="fas fa-calculator mr-1"></i> Interactive Math & Division Challenge</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Mode Selector Dropdown -->
+            <select id="gameModeSelect" onchange="changeGameMode(this.value)" class="bg-slate-900 text-slate-200 font-bold font-game text-xs md:text-sm px-3 py-2 rounded-xl border border-slate-700 outline-none cursor-pointer hover:bg-slate-800 transition shadow-inner">
+                <option value="class">👥 Class / 2-Player Local</option>
+                <option value="online">🌐 Online Room Code</option>
+                <option value="ai-easy">🤖 Vs AI Bot (Easy)</option>
+                <option value="ai-medium" selected>🤖 Vs AI Bot (Pro)</option>
+                <option value="ai-hard">🧠 Vs Master AI Bot</option>
+            </select>
+
+            <button onclick="toggleSound()" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="Toggle Sound">
+                <i id="soundIcon" class="fas fa-volume-up text-indigo-400"></i>
+            </button>
+            <button onclick="openRulesModal()" class="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="Game Rules">
+                <i class="fas fa-book-open text-purple-400"></i>
+            </button>
+            <button onclick="resetGame()" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold transition flex items-center gap-2 shadow">
+                <i class="fas fa-rotate-left"></i> Reset Board
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME LAYOUT -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 my-auto max-w-7xl mx-auto w-full py-4">
+        
+        <!-- LEFT PANEL: TEAMS & DICE CONTROLS (4 Columns) -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+            
+            <!-- Turn Banner -->
+            <div id="turnBanner" class="w-full py-3 px-4 rounded-xl font-display text-xl font-bold text-center bg-rose-950/70 text-rose-300 border-2 border-rose-600/60 shadow-lg animate-pulse">
+                🔴 TEAM 1'S TURN!
+            </div>
+
+            <!-- Multiplayer Room Info Bar (Hidden by Default) -->
+            <div id="roomInfoBar" class="hidden glass-panel p-3 rounded-xl flex items-center justify-between text-xs font-game">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span class="text-slate-300">Room Code: <strong id="displayRoomCode" class="text-indigo-400 text-sm tracking-widest font-mono">---</strong></span>
+                </div>
+                <button onclick="copyRoomCode()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded-md text-[10px] transition border border-slate-600">
+                    <i class="fas fa-copy mr-1"></i> Copy Code
+                </button>
+            </div>
+
+            <!-- Team Score Cards -->
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Team 1 / Player 1 (Red) -->
+                <div id="teamCard1" class="glass-panel p-4 rounded-2xl border-2 border-rose-500 transition-all duration-300 text-center relative overflow-hidden">
+                    <div id="activeIndicator1" class="absolute top-2 right-2 w-3 h-3 rounded-full bg-rose-500 animate-ping"></div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-400 block mb-1" id="team1Label">Player 1</span>
+                    <span class="text-2xl font-black font-display text-rose-300 block" id="team1Name">TEAM RED</span>
+                    <div class="mt-2 text-xs text-slate-400">Claimed: <span id="team1Count" class="font-bold text-white text-base">0</span></div>
+                    <div class="text-xs text-slate-400">Score: <span id="team1Score" class="font-bold text-rose-400">0</span></div>
+                </div>
+
+                <!-- Team 2 / AI (Blue) -->
+                <div id="teamCard2" class="glass-panel p-4 rounded-2xl border-2 border-transparent transition-all duration-300 text-center relative overflow-hidden">
+                    <div id="activeIndicator2" class="absolute top-2 right-2 w-3 h-3 rounded-full bg-cyan-400 animate-ping hidden"></div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-cyan-400 block mb-1" id="team2Label">Player 2</span>
+                    <span class="text-2xl font-black font-display text-cyan-300 block" id="team2Name">TEAM BLUE</span>
+                    <div class="mt-2 text-xs text-slate-400">Claimed: <span id="team2Count" class="font-bold text-white text-base">0</span></div>
+                    <div class="text-xs text-slate-400">Score: <span id="team2Score" class="font-bold text-cyan-400">0</span></div>
+                </div>
+            </div>
+
+            <!-- Dice Roll Area -->
+            <div class="glass-panel p-5 rounded-2xl border border-slate-700/80 text-center flex flex-col items-center justify-between">
+                
+                <div class="flex items-center justify-between w-full mb-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider"><i class="fas fa-hourglass-half mr-1"></i> Turn Timer</span>
+                    <span class="text-sm font-bold font-mono text-indigo-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                        ⏱️ <span id="timerSeconds">45</span>s
+                    </span>
+                </div>
+
+                <!-- 3D Style Dice Display -->
+                <div class="flex items-center justify-center gap-4 my-2">
+                    <div class="dice-container">
+                        <div class="dice flex items-center justify-center text-3xl font-black font-display bg-slate-100 text-slate-900 rounded-xl border-4 border-indigo-400 shadow-2xl w-16 h-16" id="die1">?</div>
+                    </div>
+                    <span class="text-2xl font-bold text-slate-400 font-display">×</span>
+                    <div class="dice-container">
+                        <div class="dice flex items-center justify-center text-3xl font-black font-display bg-slate-100 text-slate-900 rounded-xl border-4 border-indigo-400 shadow-2xl w-16 h-16" id="die2">?</div>
+                    </div>
+                </div>
+
+                <!-- Rolled Product Result (Target Dividend) -->
+                <div class="mt-4 mb-4 w-full">
+                    <span class="text-xs uppercase tracking-wider text-slate-400 block mb-1"><i class="fas fa-bullseye mr-1"></i> Target Dividend</span>
+                    <div class="text-4xl font-black font-display text-indigo-300 bg-slate-900 px-6 py-2 rounded-xl border border-indigo-500/40 inline-block min-w-[140px] shadow-inner" id="dividendDisplay">
+                        --
+                    </div>
+                </div>
+
+                <!-- Interactive Divisor Input Panel -->
+                <div id="divisorPanel" class="w-full bg-slate-900/90 p-4 rounded-xl border border-indigo-500/40 mb-4 hidden">
+                    <label class="block text-xs font-bold text-indigo-300 uppercase tracking-wider mb-2">
+                        1. Enter Your Divisor
+                    </label>
+                    <div class="flex items-center justify-center gap-2 mb-3">
+                        <span id="calcDividend" class="text-2xl font-bold font-display text-indigo-300">24</span>
+                        <span class="text-xl font-bold text-slate-400 font-game">÷</span>
+                        <input type="number" id="chosenDivisorInput" placeholder="?" min="1" max="36" class="w-20 text-center text-2xl font-black bg-slate-800 border-2 border-indigo-500 text-white py-1.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 font-display">
+                        <span class="text-xl font-bold text-slate-400 font-game">=</span>
+                        <span id="calcQuotientPreview" class="text-2xl font-black font-display text-cyan-400">?</span>
+                    </div>
+                    <button onclick="calculateAndSelectQuotient()" class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-lg transition font-display text-sm shadow-md flex items-center justify-center gap-2">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Calculate Quotient</span>
+                    </button>
+                </div>
+
+                <!-- Action Button -->
+                <button id="rollBtn" onclick="rollDice()" class="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-black text-xl rounded-xl shadow-lg shadow-indigo-950/60 transition transform active:scale-95 font-display tracking-wide flex items-center justify-center gap-3 border border-white/20">
+                    <i class="fas fa-dice text-2xl"></i>
+                    <span>ROLL DICE</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: 3x3 QUOTIENT BOARD (8 Columns) -->
+        <section class="lg:col-span-8 w-full flex flex-col items-center">
+            
+            <!-- Game Canvas Board Container -->
+            <div class="w-full max-w-xl aspect-square board-container p-4 md:p-6 rounded-3xl shadow-2xl flex flex-col justify-between relative overflow-hidden">
+                <!-- Floating grid accent icons -->
+                <i class="fas fa-border-all absolute top-4 left-6 text-indigo-500/10 text-6xl pointer-events-none"></i>
+                <i class="fas fa-hashtag absolute bottom-6 right-6 text-indigo-500/10 text-8xl pointer-events-none"></i>
+
+                <div class="grid grid-cols-3 gap-3 md:gap-4 h-full relative z-10" id="boardGrid">
+                    <!-- 9 Board Tiles generated via JavaScript -->
+                </div>
+            </div>
+
+            <!-- Context Helper Footer -->
+            <div id="gameInstruction" class="mt-4 text-center text-slate-300 text-sm font-medium bg-slate-900/80 px-6 py-2.5 rounded-full border border-slate-800 shadow">
+                <i class="fas fa-info-circle text-indigo-400 mr-2"></i>
+                <span>Roll the dice to get a dividend, then solve for a quotient present on the board!</span>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- MODAL: MATH EQUATION ANSWER CHECKER -->
+    <div id="mathModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl relative text-center">
+            <button onclick="closeMathModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-2">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <div class="inline-block p-3 rounded-2xl bg-indigo-900/60 text-indigo-400 mb-3 text-3xl">
+                <i class="fas fa-calculator"></i>
+            </div>
+
+            <h3 class="text-2xl font-black font-display text-white mb-1" id="modalTitle">Claim Board Tile</h3>
+            <p class="text-sm text-slate-400 mb-6" id="modalSubtitle">Verify your divisor math to claim this square!</p>
+
+            <!-- Big Math Equation Prompt -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-6 flex items-center justify-center gap-3 text-2xl md:text-3xl font-black font-display">
+                <span id="eqDividend" class="text-indigo-400">24</span>
+                <span class="text-slate-400">÷</span>
+                <span class="px-4 py-1.5 bg-slate-800 text-slate-200 rounded-xl border-2 border-indigo-500 border-dashed inline-block min-w-[60px]" id="eqDivisor">?</span>
+                <span class="text-slate-400">=</span>
+                <span id="eqTargetQuotient" class="text-cyan-400">3</span>
+            </div>
+
+            <!-- Number Input Box -->
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Enter your Divisor</label>
+                <input type="number" id="divisorInput" autofocus placeholder="?" class="w-full text-center text-3xl font-bold bg-slate-900 border-2 border-slate-700 focus:border-indigo-400 text-white py-3 rounded-xl outline-none transition font-display">
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex gap-3">
+                <button onclick="closeMathModal()" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition border border-slate-700">
+                    Cancel
+                </button>
+                <button onclick="submitMathAnswer()" class="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition font-display">
+                    Submit Answer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ONLINE ROOM CODE HOST / JOIN -->
+    <div id="roomModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl relative text-center">
+            
+            <button onclick="closeRoomModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-2">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <div class="inline-block p-3 rounded-2xl bg-indigo-900/40 text-indigo-400 mb-3 text-3xl">
+                <i class="fas fa-network-wired"></i>
+            </div>
+
+            <h3 class="text-2xl font-black font-display text-white mb-1">Classroom Multiplayer</h3>
+            <p class="text-sm text-slate-400 mb-6">Host a game code or enter a classmate's 4-digit code to join!</p>
+
+            <div class="space-y-4">
+                <!-- Host Section -->
+                <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Option A: Host a New Game</h4>
+                    <button onclick="hostRoom()" class="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-black text-base rounded-xl font-display transition shadow-lg">
+                        <i class="fas fa-plus-circle mr-1"></i> Create Game Code
+                    </button>
+                </div>
+
+                <div class="text-xs text-slate-500 uppercase tracking-widest font-bold">OR</div>
+
+                <!-- Join Section -->
+                <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">Option B: Join Existing Game</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="joinCodeInput" placeholder="Enter Code (e.g. 4829)" maxlength="6" class="w-full text-center text-xl font-bold font-display bg-slate-800 border border-slate-700 text-white rounded-xl uppercase outline-none focus:border-cyan-400">
+                        <button onclick="joinRoom()" class="py-3 px-5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl font-display transition shrink-0">
+                            Join
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="connectionStatus" class="mt-4 text-xs font-game text-indigo-300"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: WINNER / END GAME OVERLAY -->
+    <div id="winModal" class="fixed inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 z-50 hidden">
+        <div class="glass-panel p-8 rounded-3xl max-w-lg w-full border-2 border-indigo-500 shadow-2xl text-center relative overflow-hidden">
+            <div class="text-6xl mb-4" id="winIcon">🏆</div>
+            <h2 class="text-4xl font-black font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-indigo-300 to-purple-300 mb-2 drop-shadow-lg" id="winTitle">
+                VICTORY!
+            </h2>
+            <p class="text-xl text-slate-200 font-semibold mb-6" id="winMessage">
+                Team Red connected 3 squares in a row!
+            </p>
+
+            <button onclick="resetGame(); closeWinModal();" class="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-black text-xl rounded-xl shadow-xl font-display transition transform active:scale-95">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: CLASSROOM RULES -->
+    <div id="rulesModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="glass-panel p-6 md:p-8 rounded-3xl max-w-xl w-full border border-slate-700 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto">
+            <button onclick="closeRulesModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-2">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <h3 class="text-2xl font-black font-display text-indigo-400 mb-4 flex items-center gap-2">
+                <i class="fas fa-book-open"></i> How to Play Quotient Tac Toe
+            </h3>
+            
+            <div class="space-y-4 text-slate-200 text-sm leading-relaxed">
+                <div class="flex gap-3">
+                    <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 mt-0.5 font-display">1</span>
+                    <p><strong class="text-indigo-300">Roll the Dice:</strong> On your turn, roll two 6-sided dice. Multiply them together to find your <strong>Target Dividend</strong>.</p>
+                </div>
+                <div class="flex gap-3">
+                    <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 mt-0.5 font-display">2</span>
+                    <p><strong class="text-indigo-300">Calculate Quotient:</strong> Enter a valid divisor to calculate a quotient ($Q$) that appears on the 3x3 board grid.</p>
+                </div>
+                <div class="flex gap-3">
+                    <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 mt-0.5 font-display">3</span>
+                    <p><strong class="text-indigo-300">Claim the Tile:</strong> Tap the corresponding quotient square on the board to claim it for your team!</p>
+                </div>
+                <div class="flex gap-3">
+                    <span class="w-7 h-7 rounded-full bg-purple-500 text-white flex items-center justify-center font-black text-xs shrink-0 mt-0.5 font-display">4</span>
+                    <p><strong class="text-purple-300">Stealing Squares:</strong> You can steal squares owned by your opponent if your rolled dividend can produce that square's quotient!</p>
+                </div>
+                <div class="flex gap-3">
+                    <span class="w-7 h-7 rounded-full bg-pink-500 text-white flex items-center justify-center font-black text-xs shrink-0 mt-0.5 font-display">5</span>
+                    <p><strong class="text-pink-300">Win Condition:</strong> Connect 3 squares in a row (horizontally, vertically, or diagonally) to win!</p>
+                </div>
+            </div>
+
+            <button onclick="closeRulesModal()" class="w-full mt-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition border border-slate-700">
+                Got It!
+            </button>
+        </div>
+    </div>
+
+    <!-- AUDIO SYNTH (WEBAUDIO API) WITH CLEAN SYNTH SOUNDS -->
+    <script>
+        // Web Audio API Sound Generator tuned for clean digital arcade sounds
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'roll') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(480, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'claim') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.08);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'steal') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+                    osc.start(now);
+                    osc.stop(now + 0.28);
+                } else if (type === 'error') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.setValueAtTime(130, now + 0.1);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'win') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const noteOsc = audioCtx.createOscillator();
+                        const noteGain = audioCtx.createGain();
+                        noteOsc.connect(noteGain);
+                        noteGain.connect(audioCtx.destination);
+                        noteOsc.frequency.setValueAtTime(freq, now + (idx * 0.12));
+                        noteGain.gain.setValueAtTime(0.25, now + (idx * 0.12));
+                        noteGain.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.12) + 0.4);
+                        noteOsc.start(now + (idx * 0.12));
+                        noteOsc.stop(now + (idx * 0.12) + 0.4);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio play error", e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            if (soundEnabled) {
+                icon.className = "fas fa-volume-up text-indigo-400";
+            } else {
+                icon.className = "fas fa-volume-mute text-slate-500";
+            }
+        }
+    </script>
+
+    <!-- CORE GAME ENGINE SCRIPT -->
+    <script>
+        // Game State Variables
+        const FREQUENT_QUOTIENTS = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 6, 8, 8, 9, 9, 12, 12];
+        const RARE_QUOTIENTS = [5, 10, 15, 16, 18, 20, 24, 25, 30, 36];
+
+        // Inappropriate Name Filter List
+        const BLOCKED_WORDS = [
+            'fuck', 'shit', 'ass', 'bitch', 'crap', 'dick', 'pussy', 'bastard', 
+            'whore', 'slut', 'cunt', 'nigger', 'faggot', 'penis', 'vagina', 'sex', 
+            'damn', 'piss', 'cock', 'tit', 'boob', 'nazi', 'hitler', 'dumb', 'stupid'
+        ];
+
+        let boardQuotients = [];
+        let boardState = Array(9).fill(null); // null, 1 (Team 1), or 2 (Team 2/AI)
+        let activeTeam = 1;
+        let gameMode = 'ai-medium';
+        let isAiThinking = false;
+
+        // Custom Player Configuration
+        let p1Config = { name: "Team Red", color: "rose" };
+        let p2Config = { name: "Math Bot", color: "cyan" };
+        let setupSelectedMode = 'human';
+
+        const COLOR_MAP = {
+            rose: { bg: 'from-rose-600 via-red-700 to-rose-900', border: 'border-rose-400', text: 'text-rose-400', badge: 'bg-rose-950/60', hex: '#f43f5e' },
+            cyan: { bg: 'from-cyan-600 via-blue-700 to-cyan-900', border: 'border-cyan-400', text: 'text-cyan-400', badge: 'bg-cyan-950/60', hex: '#06b6d4' },
+            emerald: { bg: 'from-emerald-600 via-green-700 to-emerald-900', border: 'border-emerald-400', text: 'text-emerald-400', badge: 'bg-emerald-950/60', hex: '#10b981' },
+            amber: { bg: 'from-amber-500 via-yellow-600 to-amber-800', border: 'border-amber-400', text: 'text-amber-400', badge: 'bg-amber-950/60', hex: '#f59e0b' },
+            purple: { bg: 'from-purple-600 via-indigo-700 to-purple-900', border: 'border-purple-400', text: 'text-purple-400', badge: 'bg-purple-950/60', hex: '#a855f7' },
+            pink: { bg: 'from-pink-600 via-rose-700 to-pink-900', border: 'border-pink-400', text: 'text-pink-400', badge: 'bg-pink-950/60', hex: '#ec4899' }
+        };
+
+        // PeerJS Networking Variables
+        let peer = null;
+        let peerConn = null;
+        let myPeerId = null;
+        let isHost = false;
+        let myAssignedTeam = 1;
+
+        let currentDie1 = 0;
+        let currentDie2 = 0;
+        let currentDividend = 0;
+        let hasRolled = false;
+        let calculatedQuotient = null;
+        let currentDivisor = null;
+        let timerInterval = null;
+        let timerSeconds = 45;
+
+        const WINNING_COMBOS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        window.onload = function() {
+            shuffleBoardQuotients();
+            renderBoard();
+            updateTurnUI();
+            startTimer();
+        };
+
+        // --- SETUP MODAL CONTROLS ---
+        function setSetupMode(mode) {
+            setupSelectedMode = mode;
+            const btnHuman = document.getElementById('setupBtnHuman');
+            const btnAi = document.getElementById('setupBtnAi');
+            const p2Input = document.getElementById('setupP2Name');
+            const p2Label = document.getElementById('setupP2Label');
+
+            if (mode === 'human') {
+                btnHuman.className = "py-3 px-4 rounded-xl border-2 border-indigo-500 bg-indigo-950/60 text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition";
+                btnAi.className = "py-3 px-4 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 hover:text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition";
+                p2Label.innerText = "Player 2 / Team 2";
+                if (p2Input.value === "Math Bot") p2Input.value = "Team Blue";
+                p2Input.disabled = false;
+            } else {
+                btnAi.className = "py-3 px-4 rounded-xl border-2 border-indigo-500 bg-indigo-950/60 text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition";
+                btnHuman.className = "py-3 px-4 rounded-xl border-2 border-slate-700 bg-slate-900/60 text-slate-400 hover:text-white font-bold text-sm font-display flex items-center justify-center gap-2 transition";
+                p2Label.innerText = "AI Bot";
+                p2Input.value = "Math Bot";
+                p2Input.disabled = true;
+            }
+        }
+
+        function selectColor(player, colorKey) {
+            if (player === 1) {
+                if (colorKey === p2Config.color) return; // Prevent selecting same color as P2
+                p1Config.color = colorKey;
+                updatePickerUI(1, colorKey);
+            } else {
+                if (colorKey === p1Config.color) return; // Prevent selecting same color as P1
+                p2Config.color = colorKey;
+                updatePickerUI(2, colorKey);
+            }
+        }
+
+        function updatePickerUI(player, colorKey) {
+            const container = document.getElementById(`p${player}ColorPickers`);
+            const buttons = container.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('data-color') === colorKey) {
+                    btn.className = `w-8 h-8 rounded-full bg-${btn.getAttribute('data-color') === 'amber' ? 'amber-500' : btn.getAttribute('data-color') + '-600'} border-2 border-white scale-110 shadow`;
+                } else {
+                    btn.className = `w-8 h-8 rounded-full bg-${btn.getAttribute('data-color') === 'amber' ? 'amber-500' : btn.getAttribute('data-color') + '-600'} border-2 border-transparent hover:border-white`;
+                }
+            });
+        }
+
+        function filterInappropriateNames(name) {
+            const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            for (let word of BLOCKED_WORDS) {
+                if (clean.includes(word)) return true;
+            }
+            return false;
+        }
+
+        function confirmSetupAndStart() {
+            const p1NameInput = document.getElementById('setupP1Name').value.trim();
+            const p2NameInput = document.getElementById('setupP2Name').value.trim();
+            const errBox = document.getElementById('setupErrorMsg');
+
+            if (!p1NameInput || !p2NameInput) {
+                errBox.innerText = "Please enter valid names for both players!";
+                errBox.classList.remove('hidden');
+                return;
+            }
+
+            if (filterInappropriateNames(p1NameInput) || filterInappropriateNames(p2NameInput)) {
+                errBox.innerText = "Please choose appropriate, school-friendly names!";
+                errBox.classList.remove('hidden');
+                playSound('error');
+                return;
+            }
+
+            errBox.classList.add('hidden');
+            p1Config.name = p1NameInput;
+            p2Config.name = p2NameInput;
+
+            // Apply selected game mode dropdown matching setup modal
+            const modeSelect = document.getElementById('gameModeSelect');
+            if (setupSelectedMode === 'ai') {
+                modeSelect.value = 'ai-medium';
+                gameMode = 'ai-medium';
+            } else {
+                modeSelect.value = 'class';
+                gameMode = 'class';
+            }
+
+            // Apply names & colors to UI cards
+            document.getElementById('team1Name').innerText = p1Config.name.toUpperCase();
+            document.getElementById('team2Name').innerText = p2Config.name.toUpperCase();
+            
+            document.getElementById('team1Label').innerText = "Player 1";
+            document.getElementById('team2Label').innerText = setupSelectedMode === 'ai' ? "AI Player" : "Player 2";
+
+            const c1 = COLOR_MAP[p1Config.color];
+            const c2 = COLOR_MAP[p2Config.color];
+
+            document.getElementById('team1Label').className = `text-xs font-bold uppercase tracking-wider ${c1.text} block mb-1`;
+            document.getElementById('team1Name').className = `text-2xl font-black font-display ${c1.text} block`;
+            document.getElementById('team1Score').className = `font-bold ${c1.text}`;
+            document.getElementById('activeIndicator1').className = `absolute top-2 right-2 w-3 h-3 rounded-full bg-${p1Config.color === 'amber' ? 'amber-500' : p1Config.color + '-500'} animate-ping`;
+
+            document.getElementById('team2Label').className = `text-xs font-bold uppercase tracking-wider ${c2.text} block mb-1`;
+            document.getElementById('team2Name').className = `text-2xl font-black font-display ${c2.text} block`;
+            document.getElementById('team2Score').className = `font-bold ${c2.text}`;
+            document.getElementById('activeIndicator2').className = `absolute top-2 right-2 w-3 h-3 rounded-full bg-${p2Config.color === 'amber' ? 'amber-500' : p2Config.color + '-500'} animate-ping hidden`;
+
+            document.getElementById('setupModal').classList.add('hidden');
+            resetGame();
+        }
+
+        function shuffleBoardQuotients() {
+            const pool = [...FREQUENT_QUOTIENTS];
+            const shuffledRare = [...RARE_QUOTIENTS].sort(() => 0.5 - Math.random());
+            pool.push(...shuffledRare.slice(0, 3));
+
+            const uniquePicked = [];
+            const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
+
+            for (let num of shuffledPool) {
+                if (!uniquePicked.includes(num)) {
+                    uniquePicked.push(num);
+                }
+                if (uniquePicked.length === 8) break;
+            }
+
+            const duplicateValue = uniquePicked[Math.floor(Math.random() * uniquePicked.length)];
+            boardQuotients = [...uniquePicked, duplicateValue].sort(() => 0.5 - Math.random());
+        }
+
+        function changeGameMode(mode) {
+            gameMode = mode;
+            const t2Name = document.getElementById('team2Name');
+            const t2Label = document.getElementById('team2Label');
+            const roomInfo = document.getElementById('roomInfoBar');
+
+            if (mode === 'online') {
+                document.getElementById('roomModal').classList.remove('hidden');
+                roomInfo.classList.remove('hidden');
+                return;
+            } else {
+                roomInfo.classList.add('hidden');
+                if (peerConn) {
+                    peerConn.close();
+                    peerConn = null;
+                }
+            }
+
+            if (mode === 'class') {
+                t2Name.innerText = "TEAM BLUE";
+                t2Label.innerText = "Player 2";
+            } else {
+                t2Name.innerText = "MATH BOT";
+                t2Label.innerText = "AI Player";
+            }
+            resetGame();
+        }
+
+        function closeRoomModal() {
+            document.getElementById('roomModal').classList.add('hidden');
+            if (gameMode === 'online' && !peerConn) {
+                document.getElementById('gameModeSelect').value = 'class';
+                changeGameMode('class');
+            }
+        }
+
+        // --- PEERJS MULTIPLAYER LOGIC ---
+        function initPeer(callback) {
+            if (peer) {
+                if (callback) callback();
+                return;
+            }
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.innerText = "Connecting to classroom server...";
+
+            const randomCode = Math.floor(1000 + Math.random() * 9000);
+            const peerId = 'qtt-room-' + randomCode;
+
+            peer = new Peer(peerId);
+
+            peer.on('open', (id) => {
+                myPeerId = id;
+                statusEl.innerText = "";
+                if (callback) callback(randomCode);
+            });
+
+            peer.on('connection', (conn) => {
+                peerConn = conn;
+                isHost = true;
+                myAssignedTeam = 1;
+                setupConnectionListeners();
+                statusEl.innerText = "Opponent connected to your game!";
+                setTimeout(closeRoomModal, 1000);
+                sendNetworkState();
+            });
+
+            peer.on('error', (err) => {
+                console.error("PeerJS error:", err);
+                statusEl.innerText = "Connection error. Retrying...";
+                peer = new Peer();
+                peer.on('open', (id) => {
+                    myPeerId = id;
+                    if (callback) callback(id);
+                });
+            });
+        }
+
+        function hostRoom() {
+            initPeer((code) => {
+                const codeStr = String(code);
+                document.getElementById('displayRoomCode').innerText = codeStr;
+                document.getElementById('connectionStatus').innerHTML = `
+                    <div class="p-3 bg-slate-900 rounded-xl border border-indigo-500/40 text-slate-200">
+                        Room Code: <span class="font-bold text-xl font-mono text-indigo-400">${codeStr}</span>
+                        <p class="text-[11px] mt-1 text-slate-400">Share this 4-digit code with a classmate to connect!</p>
+                    </div>
+                `;
+            });
+        }
+
+        function joinRoom() {
+            const rawCode = document.getElementById('joinCodeInput').value.trim();
+            if (!rawCode) {
+                alert("Please enter a room code!");
+                return;
+            }
+
+            const targetPeerId = rawCode.startsWith('qtt-room-') ? rawCode : 'qtt-room-' + rawCode;
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.innerText = "Joining game " + rawCode + "...";
+
+            initPeer(() => {
+                peerConn = peer.connect(targetPeerId);
+                isHost = false;
+                myAssignedTeam = 2;
+                setupConnectionListeners();
+            });
+        }
+
+        function setupConnectionListeners() {
+            const statusEl = document.getElementById('connectionStatus');
+            
+            peerConn.on('open', () => {
+                statusEl.innerText = "Connected! Loading board...";
+                document.getElementById('team2Name').innerText = "TEAM BLUE";
+                document.getElementById('team2Label').innerText = "Remote Player";
+                document.getElementById('displayRoomCode').innerText = isHost ? myPeerId.replace('qtt-room-', '') : "JOINED";
+                document.getElementById('roomInfoBar').classList.remove('hidden');
+                setTimeout(closeRoomModal, 800);
+            });
+
+            peerConn.on('data', (data) => {
+                handleNetworkMessage(data);
+            });
+
+            peerConn.on('close', () => {
+                alert("Opponent disconnected!");
+                changeGameMode('class');
+            });
+        }
+
+        function sendNetworkState() {
+            if (!peerConn) return;
+            peerConn.send({
+                type: 'STATE_UPDATE',
+                boardQuotients: boardQuotients,
+                boardState: boardState,
+                activeTeam: activeTeam,
+                currentDie1: currentDie1,
+                currentDie2: currentDie2,
+                currentDividend: currentDividend,
+                hasRolled: hasRolled,
+                calculatedQuotient: calculatedQuotient
+            });
+        }
+
+        function sendNetworkAction(actionType, payload) {
+            if (!peerConn) return;
+            peerConn.send({
+                type: actionType,
+                payload: payload
+            });
+        }
+
+        function handleNetworkMessage(data) {
+            if (data.type === 'STATE_UPDATE') {
+                boardQuotients = data.boardQuotients;
+                boardState = data.boardState;
+                activeTeam = data.activeTeam;
+                currentDie1 = data.currentDie1;
+                currentDie2 = data.currentDie2;
+                currentDividend = data.currentDividend;
+                hasRolled = data.hasRolled;
+                calculatedQuotient = data.calculatedQuotient;
+
+                document.getElementById('die1').innerText = currentDie1 || '?';
+                document.getElementById('die2').innerText = currentDie2 || '?';
+                document.getElementById('dividendDisplay').innerText = currentDividend || '--';
+
+                renderBoard();
+                updateTurnUI();
+            } else if (data.type === 'ROLL_DICE') {
+                currentDie1 = data.payload.die1;
+                currentDie2 = data.payload.die2;
+                currentDividend = currentDie1 * currentDie2;
+                hasRolled = true;
+
+                document.getElementById('die1').innerText = currentDie1;
+                document.getElementById('die2').innerText = currentDie2;
+                document.getElementById('dividendDisplay').innerText = currentDividend;
+                document.getElementById('calcDividend').innerText = currentDividend;
+
+                playSound('roll');
+                updateTurnUI();
+            } else if (data.type === 'EXECUTE_CLAIM') {
+                const { index, team } = data.payload;
+                executeClaimNetwork(index, team);
+            }
+        }
+
+        function copyRoomCode() {
+            const code = document.getElementById('displayRoomCode').innerText;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(code);
+            } else {
+                const dummy = document.createElement('input');
+                document.body.appendChild(dummy);
+                dummy.value = code;
+                dummy.select();
+                document.execCommand('copy');
+                document.body.removeChild(dummy);
+            }
+            alert(`Room Code ${code} copied to clipboard!`);
+        }
+
+        // Render 3x3 Grid
+        function renderBoard() {
+            const grid = document.getElementById('boardGrid');
+            grid.innerHTML = '';
+
+            const c1 = COLOR_MAP[p1Config.color] || COLOR_MAP.rose;
+            const c2 = COLOR_MAP[p2Config.color] || COLOR_MAP.cyan;
+
+            boardQuotients.forEach((quotient, index) => {
+                const owner = boardState[index];
+                const tile = document.createElement('button');
+                tile.id = `tile-${index}`;
+                
+                let tileStyle = "flex flex-col items-center justify-center rounded-2xl p-4 transition-all duration-300 font-display relative border-4 shadow-xl min-h-[100px] ";
+                
+                if (owner === 1) {
+                    // Custom Team 1 Color
+                    tileStyle += `bg-gradient-to-br ${c1.bg} ${c1.border} text-white shadow-lg`;
+                } else if (owner === 2) {
+                    // Custom Team 2 Color
+                    tileStyle += `bg-gradient-to-br ${c2.bg} ${c2.border} text-white shadow-lg`;
+                } else {
+                    // Neutral Unclaimed Tile
+                    tileStyle += "bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/80 text-slate-100 hover:border-indigo-400/80 shadow-inner";
+                }
+
+                tile.className = tileStyle;
+                tile.onclick = () => handleTileClick(index, quotient);
+
+                let iconContent = '';
+                if (owner === 1) {
+                    iconContent = `<div class="absolute top-2 right-2 ${c1.text} text-xs flex items-center gap-1 font-sans font-bold ${c1.badge} px-1.5 py-0.5 rounded"><i class="fas fa-circle"></i> ${p1Config.name}</div>`;
+                } else if (owner === 2) {
+                    iconContent = `<div class="absolute top-2 right-2 ${c2.text} text-xs flex items-center gap-1 font-sans font-bold ${c2.badge} px-1.5 py-0.5 rounded"><i class="fas fa-circle"></i> ${p2Config.name}</div>`;
+                }
+
+                tile.innerHTML = `
+                    ${iconContent}
+                    <span class="text-xs uppercase tracking-wider text-slate-400 font-sans font-bold">Quotient</span>
+                    <span class="text-4xl md:text-5xl font-black drop-shadow">${quotient}</span>
+                `;
+
+                grid.appendChild(tile);
+            });
+
+            updateScores();
+        }
+
+        // Dice Roll Logic
+        function rollDice() {
+            if (hasRolled || isAiThinking) return;
+
+            if (gameMode === 'online' && activeTeam !== myAssignedTeam) {
+                alert("It's your opponent's turn!");
+                return;
+            }
+
+            playSound('roll');
+            const rollBtn = document.getElementById('rollBtn');
+            rollBtn.disabled = true;
+            rollBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const die1El = document.getElementById('die1');
+            const die2El = document.getElementById('die2');
+            
+            die1El.classList.add('animate-bounce');
+            die2El.classList.add('animate-bounce');
+
+            let rolls = 0;
+            const rollInterval = setInterval(() => {
+                const temp1 = Math.floor(Math.random() * 6) + 1;
+                const temp2 = Math.floor(Math.random() * 6) + 1;
+                die1El.innerText = temp1;
+                die2El.innerText = temp2;
+                rolls++;
+
+                if (rolls > 10) {
+                    clearInterval(rollInterval);
+                    die1El.classList.remove('animate-bounce');
+                    die2El.classList.remove('animate-bounce');
+
+                    currentDie1 = Math.floor(Math.random() * 6) + 1;
+                    currentDie2 = Math.floor(Math.random() * 6) + 1;
+                    currentDividend = currentDie1 * currentDie2;
+
+                    die1El.innerText = currentDie1;
+                    die2El.innerText = currentDie2;
+                    document.getElementById('dividendDisplay').innerText = currentDividend;
+                    document.getElementById('calcDividend').innerText = currentDividend;
+
+                    hasRolled = true;
+
+                    if (gameMode === 'online') {
+                        sendNetworkAction('ROLL_DICE', { die1: currentDie1, die2: currentDie2 });
+                    }
+
+                    const validMoves = getValidMovesForDividend(currentDividend);
+                    if (validMoves.length === 0) {
+                        playSound('error');
+                        document.getElementById('gameInstruction').innerHTML = `
+                            <span class="text-rose-400 font-bold animate-bounce"><i class="fas fa-ban mr-1"></i> No quotients on the board work for dividend ${currentDividend}! Turn lost.</span>
+                        `;
+                        setTimeout(() => {
+                            switchTurn();
+                        }, 2200);
+                        return;
+                    }
+
+                    if (activeTeam === 2 && (gameMode.startsWith('ai-'))) {
+                        triggerAiTurn();
+                    } else {
+                        document.getElementById('divisorPanel').classList.remove('hidden');
+                        document.getElementById('chosenDivisorInput').value = '';
+                        document.getElementById('calcQuotientPreview').innerText = '?';
+                        document.getElementById('chosenDivisorInput').focus();
+
+                        document.getElementById('gameInstruction').innerHTML = `
+                            <span class="text-indigo-300 font-bold"><i class="fas fa-calculator mr-1"></i> Enter a divisor to compute your target quotient!</span>
+                        `;
+                    }
+                }
+            }, 60);
+        }
+
+        function getValidMovesForDividend(dividend) {
+            const validMoves = [];
+            for (let d = 1; d <= dividend; d++) {
+                if (dividend % d === 0) {
+                    const q = dividend / d;
+                    boardQuotients.forEach((val, idx) => {
+                        if (val === q) {
+                            validMoves.push({
+                                divisor: d,
+                                quotient: q,
+                                boardIdx: idx,
+                                currentOwner: boardState[idx]
+                            });
+                        }
+                    });
+                }
+            }
+            return validMoves;
+        }
+
+        // AI Logic
+        function triggerAiTurn() {
+            isAiThinking = true;
+            document.getElementById('gameInstruction').innerHTML = `
+                <span class="text-cyan-400 font-bold animate-pulse"><i class="fas fa-robot mr-1"></i> Math AI Bot is evaluating choices...</span>
+            `;
+
+            setTimeout(() => {
+                const validMoves = getValidMovesForDividend(currentDividend);
+
+                if (validMoves.length === 0) {
+                    document.getElementById('gameInstruction').innerHTML = `
+                        <span class="text-rose-400 font-bold"><i class="fas fa-ban mr-1"></i> No quotients on board for ${currentDividend}. AI passes turn!</span>
+                    `;
+                    setTimeout(switchTurn, 1500);
+                    return;
+                }
+
+                let chosenMove = null;
+
+                if (gameMode === 'ai-easy') {
+                    chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                } else {
+                    for (let move of validMoves) {
+                        const tempBoard = [...boardState];
+                        tempBoard[move.boardIdx] = 2;
+                        if (WINNING_COMBOS.some(combo => combo.every(idx => tempBoard[idx] === 2))) {
+                            chosenMove = move;
+                            break;
+                        }
+                    }
+
+                    if (!chosenMove && gameMode === 'ai-hard') {
+                        for (let move of validMoves) {
+                            if (move.currentOwner === 1) {
+                                chosenMove = move;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!chosenMove) {
+                        const nonSelfMoves = validMoves.filter(m => m.currentOwner !== 2);
+                        if (nonSelfMoves.length > 0) {
+                            chosenMove = nonSelfMoves[Math.floor(Math.random() * nonSelfMoves.length)];
+                        } else {
+                            chosenMove = validMoves[0];
+                        }
+                    }
+                }
+
+                document.getElementById('calcDividend').innerText = currentDividend;
+                document.getElementById('chosenDivisorInput').value = chosenMove.divisor;
+                document.getElementById('calcQuotientPreview').innerText = chosenMove.quotient;
+                document.getElementById('divisorPanel').classList.remove('hidden');
+
+                calculatedQuotient = chosenMove.quotient;
+                currentDivisor = chosenMove.divisor;
+
+                setTimeout(() => {
+                    executeClaim(chosenMove.boardIdx);
+                    isAiThinking = false;
+                }, 1000);
+
+            }, 1200);
+        }
+
+        function calculateAndSelectQuotient() {
+            if (gameMode === 'online' && activeTeam !== myAssignedTeam) {
+                alert("It's your opponent's turn!");
+                return;
+            }
+
+            if (activeTeam === 2 && gameMode.startsWith('ai-')) return;
+
+            const divisor = parseInt(document.getElementById('chosenDivisorInput').value);
+            
+            if (!divisor || divisor <= 0) {
+                playSound('error');
+                alert("Please enter a valid positive divisor!");
+                return;
+            }
+
+            if (currentDividend % divisor !== 0) {
+                playSound('error');
+                alert(`${currentDividend} ÷ ${divisor} does not yield a whole number quotient! Try another divisor.`);
+                return;
+            }
+
+            const resQuotient = currentDividend / divisor;
+            document.getElementById('calcQuotientPreview').innerText = resQuotient;
+
+            if (!boardQuotients.includes(resQuotient)) {
+                playSound('error');
+                alert(`${currentDividend} ÷ ${divisor} = ${resQuotient}, but ${resQuotient} is NOT on the board! Pick a different divisor.`);
+                return;
+            }
+
+            calculatedQuotient = resQuotient;
+            currentDivisor = divisor;
+            playSound('claim');
+
+            document.getElementById('gameInstruction').innerHTML = `
+                <span class="text-emerald-400 font-bold"><i class="fas fa-hand-pointer mr-1"></i> Great! Now tap the square '${resQuotient}' on the board!</span>
+            `;
+        }
+
+        function executeClaim(index) {
+            const previousOwner = boardState[index];
+            boardState[index] = activeTeam;
+
+            const tile = document.getElementById(`tile-${index}`);
+            if (tile) {
+                tile.classList.add(previousOwner && previousOwner !== activeTeam ? 'animate-steal' : 'animate-select');
+                if (previousOwner && previousOwner !== activeTeam) {
+                    playSound('steal');
+                } else {
+                    playSound('claim');
+                }
+            }
+
+            if (gameMode === 'online') {
+                sendNetworkAction('EXECUTE_CLAIM', { index: index, team: activeTeam });
+            }
+
+            renderBoard();
+
+            if (checkWin(activeTeam)) {
+                setTimeout(() => triggerWin(activeTeam), 400);
+            } else if (boardState.every(cell => cell !== null)) {
+                setTimeout(triggerDraw, 400);
+            } else {
+                switchTurn();
+            }
+        }
+
+        function executeClaimNetwork(index, team) {
+            const previousOwner = boardState[index];
+            boardState[index] = team;
+
+            const tile = document.getElementById(`tile-${index}`);
+            if (tile) {
+                tile.classList.add(previousOwner && previousOwner !== team ? 'animate-steal' : 'animate-select');
+                if (previousOwner && previousOwner !== team) {
+                    playSound('steal');
+                } else {
+                    playSound('claim');
+                }
+            }
+
+            renderBoard();
+
+            if (checkWin(team)) {
+                setTimeout(() => triggerWin(team), 400);
+            } else if (boardState.every(cell => cell !== null)) {
+                setTimeout(triggerDraw, 400);
+            } else {
+                switchTurn();
+            }
+        }
+
+        function handleTileClick(index, quotient) {
+            if (gameMode === 'online' && activeTeam !== myAssignedTeam) {
+                alert("It's your opponent's turn!");
+                return;
+            }
+
+            if (activeTeam === 2 && gameMode.startsWith('ai-')) return;
+
+            if (!hasRolled) {
+                alert("Roll the dice first!");
+                return;
+            }
+
+            if (!calculatedQuotient) {
+                alert("Enter a divisor above and click 'Calculate Quotient' first!");
+                return;
+            }
+
+            if (quotient !== calculatedQuotient) {
+                playSound('error');
+                alert(`You calculated a quotient of ${calculatedQuotient}! Please tap the board square showing ${calculatedQuotient}.`);
+                return;
+            }
+
+            executeClaim(index);
+        }
+
+        function switchTurn() {
+            activeTeam = activeTeam === 1 ? 2 : 1;
+            hasRolled = false;
+            calculatedQuotient = null;
+            currentDivisor = null;
+            currentDividend = 0;
+            currentDie1 = 0;
+            currentDie2 = 0;
+
+            document.getElementById('die1').innerText = '?';
+            document.getElementById('die2').innerText = '?';
+            document.getElementById('dividendDisplay').innerText = '--';
+            document.getElementById('divisorPanel').classList.add('hidden');
+
+            const rollBtn = document.getElementById('rollBtn');
+            rollBtn.disabled = false;
+            rollBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            resetTimer();
+            updateTurnUI();
+            renderBoard();
+
+            if (activeTeam === 2 && gameMode.startsWith('ai-')) {
+                setTimeout(rollDice, 800);
+            }
+        }
+
+        function updateTurnUI() {
+            const banner = document.getElementById('turnBanner');
+            const card1 = document.getElementById('teamCard1');
+            const card2 = document.getElementById('teamCard2');
+            const ind1 = document.getElementById('activeIndicator1');
+            const ind2 = document.getElementById('activeIndicator2');
+
+            const c1 = COLOR_MAP[p1Config.color] || COLOR_MAP.rose;
+            const c2 = COLOR_MAP[p2Config.color] || COLOR_MAP.cyan;
+
+            if (activeTeam === 1) {
+                banner.innerText = gameMode === 'online' && myAssignedTeam === 1 ? `🔴 YOUR TURN (${p1Config.name.toUpperCase()})` : `🔴 ${p1Config.name.toUpperCase()}'S TURN`;
+                banner.className = `w-full py-3 px-4 rounded-xl font-display text-xl font-bold mb-5 bg-slate-900/90 ${c1.text} border-2 ${c1.border} shadow-lg animate-pulse`;
+                
+                card1.classList.add('scale-105', c1.border);
+                card2.classList.remove('scale-105', c2.border);
+                ind1.classList.remove('hidden');
+                ind2.classList.add('hidden');
+            } else {
+                let opponentTitle = `🔵 ${p2Config.name.toUpperCase()}'S TURN`;
+                if (gameMode.startsWith('ai-')) opponentTitle = `🤖 ${p2Config.name.toUpperCase()}'S TURN`;
+                if (gameMode === 'online' && myAssignedTeam === 2) opponentTitle = `🔵 YOUR TURN (${p2Config.name.toUpperCase()})`;
+
+                banner.innerText = opponentTitle;
+                banner.className = `w-full py-3 px-4 rounded-xl font-display text-xl font-bold mb-5 bg-slate-900/90 ${c2.text} border-2 ${c2.border} shadow-lg animate-pulse`;
+                
+                card2.classList.add('scale-105', c2.border);
+                card1.classList.remove('scale-105', c1.border);
+                ind2.classList.remove('hidden');
+                ind1.classList.add('hidden');
+            }
+
+            document.getElementById('gameInstruction').innerHTML = `
+                <i class="fas fa-info-circle text-indigo-400 mr-2"></i>
+                <span>Roll the dice to generate a dividend!</span>
+            `;
+        }
+
+        function resetGame() {
+            shuffleBoardQuotients();
+            boardState = Array(9).fill(null);
+            activeTeam = 1;
+            hasRolled = false;
+            calculatedQuotient = null;
+            currentDivisor = null;
+            currentDividend = 0;
+            currentDie1 = 0;
+            currentDie2 = 0;
+
+            document.getElementById('die1').innerText = '?';
+            document.getElementById('die2').innerText = '?';
+            document.getElementById('dividendDisplay').innerText = '--';
+            document.getElementById('divisorPanel').classList.add('hidden');
+
+            const rollBtn = document.getElementById('rollBtn');
+            rollBtn.disabled = false;
+            rollBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            resetTimer();
+            updateTurnUI();
+            renderBoard();
+
+            if (gameMode === 'online') {
+                sendNetworkState();
+            }
+        }
+
+        function updateScores() {
+            const t1Count = boardState.filter(c => c === 1).length;
+            const t2Count = boardState.filter(c => c === 2).length;
+
+            document.getElementById('team1Count').innerText = t1Count;
+            document.getElementById('team2Count').innerText = t2Count;
+            document.getElementById('team1Score').innerText = t1Count * 100;
+            document.getElementById('team2Score').innerText = t2Count * 100;
+        }
+
+        function checkWin(team) {
+            return WINNING_COMBOS.some(combo => {
+                const isWin = combo.every(idx => boardState[idx] === team);
+                if (isWin) {
+                    combo.forEach(idx => {
+                        const tile = document.getElementById(`tile-${idx}`);
+                        if (tile) tile.classList.add('animate-win');
+                    });
+                }
+                return isWin;
+            });
+        }
+
+        function triggerWin(team) {
+            playSound('win');
+            const teamName = team === 1 ? p1Config.name : p2Config.name;
+            document.getElementById('winTitle').innerText = `${teamName.toUpperCase()} WINS!`;
+            document.getElementById('winMessage').innerText = `Congratulations! ${teamName} connected 3 squares in a row!`;
+            document.getElementById('winIcon').innerText = team === 1 ? '🔴' : '🔵';
+            document.getElementById('winModal').classList.remove('hidden');
+        }
+
+        function triggerDraw() {
+            playSound('win');
+            document.getElementById('winTitle').innerText = "GAME IS A DRAW!";
+            document.getElementById('winMessage').innerText = "The board is full! Excellent math work from both teams.";
+            document.getElementById('winIcon').innerText = '🤝';
+            document.getElementById('winModal').classList.remove('hidden');
+        }
+
+        function closeWinModal() {
+            document.getElementById('winModal').classList.add('hidden');
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                document.getElementById('timerSeconds').innerText = timerSeconds;
+                if (timerSeconds <= 0) {
+                    playSound('error');
+                    switchTurn();
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            timerSeconds = 45;
+            document.getElementById('timerSeconds').innerText = timerSeconds;
+        }
+
+        function openRulesModal() {
+            document.getElementById('rulesModal').classList.remove('hidden');
+        }
+        function closeRulesModal() {
+            document.getElementById('rulesModal').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (hasRolled && !calculatedQuotient) {
+                    calculateAndSelectQuotient();
+                } else if (!hasRolled) {
+                    rollDice();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
