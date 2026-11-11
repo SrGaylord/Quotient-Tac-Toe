@@ -534,12 +534,15 @@
         const FREQUENT_QUOTIENTS = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 6, 6, 6, 8, 8, 9, 9, 12, 12];
         const RARE_QUOTIENTS = [5, 10, 15, 16, 18, 20, 24, 25, 30, 36];
 
-        // Inappropriate Name Filter List
+        // Inappropriate Word List (Whole-word matching)
         const BLOCKED_WORDS = [
             'fuck', 'shit', 'ass', 'bitch', 'crap', 'dick', 'pussy', 'bastard', 
             'whore', 'slut', 'cunt', 'nigger', 'faggot', 'penis', 'vagina', 'sex', 
-            'damn', 'piss', 'cock', 'tit', 'boob', 'nazi', 'hitler', 'dumb', 'stupid'
+            'damn', 'piss', 'cock', 'tit', 'boob', 'nazi', 'hitler'
         ];
+
+        // Safe words / classroom terms allowed explicitly
+        const ALLOWED_TERMS = ['class', 'sr', 'sra', 'sr g', 'mr', 'mrs', 'ms', 'dr', 'prof', 'team'];
 
         let boardQuotients = [];
         let boardState = Array(9).fill(null); // null, 1 (Team 1), or 2 (Team 2/AI)
@@ -638,9 +641,20 @@
         }
 
         function filterInappropriateNames(name) {
-            const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            for (let word of BLOCKED_WORDS) {
-                if (clean.includes(word)) return true;
+            const cleanName = name.toLowerCase().trim();
+            
+            // Allow explicit safe classroom terms
+            if (ALLOWED_TERMS.some(term => cleanName.includes(term))) {
+                return false;
+            }
+
+            // Split into individual words to check whole-word profanity
+            const words = cleanName.split(/\s+/);
+            for (let word of words) {
+                const stripped = word.replace(/[^a-z0-9]/g, '');
+                if (BLOCKED_WORDS.includes(stripped)) {
+                    return true;
+                }
             }
             return false;
         }
